@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Spinner from '../components/Spinner'
+import BackButton from '../components/BackButton'
 
 const PROVINCES = [
   'Eastern Cape','Free State','Gauteng','KwaZulu-Natal',
@@ -61,6 +62,9 @@ export default function Register() {
       {/* Right panel */}
       <div className="flex-1 flex items-center justify-center px-6 py-12 overflow-y-auto">
         <div className="w-full max-w-sm">
+          <div className="mb-6">
+            <BackButton fallbackTo="/" label="Back" />
+          </div>
           <div className="flex items-center gap-2 mb-10 lg:hidden">
             <div className="w-7 h-7 bg-ink flex items-center justify-center">
               <svg viewBox="0 0 14 14" className="w-3.5 h-3.5" fill="none">

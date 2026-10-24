@@ -6,25 +6,34 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
     "@supabase/supabase-js": "^2.39.3",
-    "@google/generative-ai": "^0.2.1",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.344.0",
+    "pdfjs-dist": "^6.4.299",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.22.3",
     "react-hot-toast": "^2.4.1",
-    "lucide-react": "^0.344.0",
-    "clsx": "^2.1.0"
+    "react-router-dom": "^6.22.3",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.1.6"
+    "vite": "^5.1.6",
+    "vite-plugin-static-copy": "^3.1.4"
   }
 }

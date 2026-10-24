@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ExternalLink, Edit3, X, Check } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import toast from 'react-hot-toast'
 
 const STATUSES = ['not_started','in_progress','submitted','awaiting_response','accepted','unsuccessful']
@@ -23,14 +24,52 @@ export default function ApplicationTracker() {
   const [form,     setForm]     = useState(BLANK)
   const [editId,   setEditId]   = useState(null)
   const [saving,   setSaving]   = useState(false)
+  const [pathwayTasks, setPathwayTasks] = useState([])
 
-  useEffect(() => { fetchApps() }, [user])
+  useEffect(() => {
+    fetchApps()
+    fetchPathwayTasks()
+  }, [user])
 
   async function fetchApps() {
     if (!user) return
     const { data } = await supabase.from('applications').select('*')
       .eq('user_id', user.id).order('deadline', { ascending: true, nullsFirst: false })
     setApps(data || [])
+  }
+
+  async function fetchPathwayTasks() {
+    if (!user) {
+      setPathwayTasks([])
+      return
+    }
+    try {
+      setPathwayTasks(await api.get('/api/pathway-tasks'))
+    } catch (err) {
+      toast.error(`Could not load pathway tasks: ${err.message}`)
+    }
+  }
+
+  async function togglePathwayTask(task) {
+    try {
+      const updated = await api.patch('/api/pathway-tasks', {
+        id: task.id,
+        completed: !task.completed,
+      })
+      setPathwayTasks(current => current.map(item => item.id === task.id ? updated : item))
+    } catch (err) {
+      toast.error(`Could not update task: ${err.message}`)
+    }
+  }
+
+  async function deletePathwayTask(task) {
+    try {
+      await api.delete('/api/pathway-tasks', task.id)
+      setPathwayTasks(current => current.filter(item => item.id !== task.id))
+      toast.success('Task removed')
+    } catch (err) {
+      toast.error(`Could not remove task: ${err.message}`)
+    }
   }
 
   async function saveApp() {
@@ -87,6 +126,36 @@ export default function ApplicationTracker() {
           </div>
         ))}
       </div>
+
+      <section className="border border-stone-300 bg-stone-100">
+        <div className="px-5 py-4 border-b border-stone-300">
+          <h2 className="font-semibold text-sm uppercase tracking-widest">Pathway action list</h2>
+          <p className="text-xs text-stone-500 mt-1">Next steps saved from your AI Pathway Advisor.</p>
+        </div>
+        {pathwayTasks.length === 0 ? (
+          <p className="px-5 py-4 text-xs text-stone-500">No pathway tasks yet. Add next steps from a pathway recommendation.</p>
+        ) : (
+          <ul className="divide-y divide-stone-300">
+            {pathwayTasks.map(task => (
+              <li key={task.id} className="flex items-start gap-3 px-5 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={task.completed}
+                  onChange={() => togglePathwayTask(task)}
+                  aria-label={`Mark task ${task.completed ? 'incomplete' : 'complete'}`}
+                />
+                <span className={`flex-1 text-sm ${task.completed ? 'line-through text-stone-400' : 'text-stone-700'}`}>
+                  {task.title}
+                </span>
+                <button onClick={() => deletePathwayTask(task)} className="p-1 text-stone-400 hover:text-ink" aria-label="Delete task">
+                  <Trash2 size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Form modal */}
       {showForm && (

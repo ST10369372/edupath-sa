@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Plus, Trash2, Info } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import SubjectUploader from '../components/SubjectUploader'
+import { markToAps } from '../lib/aps'
 
 /**
  * NSC APS Calculator
@@ -24,24 +26,21 @@ const SA_SUBJECTS = [
   'Geography','History','Accounting','Business Studies','Economics',
   'English Home Language','English First Additional Language',
   'Afrikaans Home Language','Afrikaans First Additional Language',
-  'Zulu Home Language','Sotho Home Language','Xhosa Home Language',
+  'Zulu Home Language','Zulu First Additional Language',
+  'Sotho Home Language','Sotho First Additional Language',
+  'Xhosa Home Language','Xhosa First Additional Language',
+  'Sepedi Home Language','Sepedi First Additional Language',
+  'Setswana Home Language','Setswana First Additional Language',
+  'Siswati Home Language','Siswati First Additional Language',
+  'Tshivenda Home Language','Tshivenda First Additional Language',
+  'itsonga Home Language','itsonga First Additional Language',
+  'Ndebele Home Language','Ndebele First Additional Language',
   'Computer Applications Technology','Information Technology',
   'Engineering Graphics & Design','Civil Technology','Electrical Technology',
   'Mechanical Technology','Consumer Studies','Hospitality Studies',
   'Tourism','Agricultural Sciences','Visual Arts','Music','Dramatic Arts',
   'Life Orientation',
 ]
-
-function markToAps(mark) {
-  const m = parseInt(mark) || 0
-  if (m >= 80) return 7
-  if (m >= 70) return 6
-  if (m >= 60) return 5
-  if (m >= 50) return 4
-  if (m >= 40) return 3
-  if (m >= 30) return 2
-  return 1
-}
 
 // Curated SA degree APS requirements  (min, institution examples)
 const COURSES = [
@@ -164,29 +163,64 @@ const JOBS_BY_CATEGORY = {
 const CATEGORIES = [...new Set(COURSES.map(c => c.category))]
 
 export default function ApsCalculator() {
-  const [subjects, setSubjects] = useState([
+  const [subjects,    setSubjects]    = useState([
     { subject: '', mark: '' },
     { subject: '', mark: '' },
     { subject: '', mark: '' },
   ])
   const [selectedCat, setSelectedCat] = useState('all')
-  const [calculated, setCalculated] = useState(false)
+  const [calculated,  setCalculated]  = useState(false)
 
-  function addSubject() { setSubjects(v => [...v, { subject: '', mark: '' }]) }
-  function removeSubject(i) { setSubjects(v => v.filter((_, idx) => idx !== i)) }
-  function update(i, key, val) { setSubjects(v => v.map((s, idx) => idx === i ? { ...s, [key]: val } : s)) }
+  // ─── Subject list helpers ────────────────────────────────────────────────
 
-  const valid = subjects.filter(s => s.subject && s.mark !== '')
-  const lo    = valid.find(s => s.subject === 'Life Orientation')
-  const others = valid.filter(s => s.subject !== 'Life Orientation')
+  function addSubject()           { setSubjects(v => [...v, { subject: '', mark: '' }]) }
+  function removeSubject(i)       { setSubjects(v => v.filter((_, idx) => idx !== i)) }
+  function update(i, key, val)    { setSubjects(v => v.map((s, idx) => idx === i ? { ...s, [key]: val } : s)) }
+
+  /**
+   * Called by SubjectUploader after local OCR recognises subjects from a file.
+   * Merges extracted subjects into the current list:
+   *   - Updates the mark for any subject already in the list.
+   *   - Appends new subjects.
+   *   - Removes blank placeholder rows.
+   * Then resets any previous calculation result.
+   */
+  function handleSubjectsExtracted(extracted) {
+    setSubjects(current => {
+      // Keep rows the user has already filled in
+      const existing = current.filter(s => s.subject && s.mark !== '')
+      const result   = [...existing]
+
+      for (const ext of extracted) {
+        const idx = result.findIndex(s => s.subject === ext.subject)
+        if (idx >= 0) {
+          // Overwrite the mark for a subject already in the list
+          result[idx] = { subject: ext.subject, mark: String(ext.mark) }
+        } else {
+          result.push({ subject: ext.subject, mark: String(ext.mark) })
+        }
+      }
+
+      return result.length > 0 ? result : [{ subject: '', mark: '' }]
+    })
+    // Reset results so the user re-calculates with the new marks
+    setCalculated(false)
+  }
+
+  // ─── APS calculation ─────────────────────────────────────────────────────
+
+  const valid   = subjects.filter(s => s.subject && s.mark !== '')
+  const lo      = valid.find(s => s.subject === 'Life Orientation')
+  const others  = valid
+    .filter(s => s.subject !== 'Life Orientation')
     .map(s => ({ ...s, pts: markToAps(s.mark) }))
     .sort((a, b) => b.pts - a.pts)
 
-  // APS = best 6 non-LO subjects + LO half (rounded down, max 2)
-  const top6    = others.slice(0, 6)
-  const aps6    = top6.reduce((sum, s) => sum + s.pts, 0)
-  const loHalf  = lo ? Math.min(2, Math.floor(markToAps(lo.mark) / 2)) : 0
-  const aps     = aps6 + loHalf
+  // APS = best 6 non-LO subjects + LO half value (rounded down, max 2)
+  const top6   = others.slice(0, 6)
+  const aps6   = top6.reduce((sum, s) => sum + s.pts, 0)
+  const loHalf = lo ? Math.min(2, Math.floor(markToAps(lo.mark) / 2)) : 0
+  const aps    = aps6 + loHalf
 
   const qualified = COURSES.filter(c =>
     aps >= c.minAps && (selectedCat === 'all' || c.category === selectedCat)
@@ -198,8 +232,11 @@ export default function ApsCalculator() {
   // Unique categories from qualified courses for bursary/job display
   const qualifiedCategories = [...new Set(qualified.map(c => c.category))]
 
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-8">
+      {/* Page header */}
       <div className="border-b border-stone-300 pb-8">
         <p className="section-label mb-3">NSC</p>
         <h1 className="page-title">APS Calculator</h1>
@@ -216,34 +253,63 @@ export default function ApsCalculator() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Input */}
+        {/* ── Input panel ─────────────────────────────────────────── */}
         <div className="lg:col-span-1 space-y-5">
+
+          {/* Upload section */}
           <div>
-            <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">Enter Your Marks</h2>
+            <h2 className="font-semibold text-sm uppercase tracking-widest mb-3">
+              Auto-fill from Report Card
+            </h2>
+            <SubjectUploader onSubjectsExtracted={handleSubjectsExtracted} />
+            <p className="text-2xs text-stone-400 mt-2 text-center">
+              — or enter your marks manually below —
+            </p>
+          </div>
+
+          {/* Manual entry */}
+          <div>
+            <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">Your Marks</h2>
             <div className="border border-stone-300 divide-y divide-stone-300">
               {subjects.map((s, i) => (
                 <div key={i} className="flex gap-2 px-3 py-2.5 bg-stone-100 items-center">
-                  <select className="flex-1 text-xs bg-transparent border-0 outline-none"
-                    value={s.subject} onChange={e => update(i, 'subject', e.target.value)}>
+                  <select
+                    className="flex-1 text-xs bg-transparent border-0 outline-none"
+                    value={s.subject}
+                    onChange={e => update(i, 'subject', e.target.value)}
+                  >
                     <option value="">Select subject…</option>
                     {SA_SUBJECTS.map(sub => <option key={sub}>{sub}</option>)}
                   </select>
-                  <input type="number" min="0" max="100"
+                  <input
+                    type="number" min="0" max="100"
                     className="w-14 text-center text-xs border border-stone-300 bg-stone-200 px-1 py-0.5"
                     placeholder="%"
                     value={s.mark}
-                    onChange={e => update(i, 'mark', e.target.value)} />
+                    onChange={e => update(i, 'mark', e.target.value)}
+                  />
                   {subjects.length > 1 && (
-                    <button onClick={() => removeSubject(i)} className="text-stone-400 hover:text-ink p-0.5 transition-colors"><Trash2 size={12} /></button>
+                    <button
+                      onClick={() => removeSubject(i)}
+                      className="text-stone-400 hover:text-ink p-0.5 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   )}
                 </div>
               ))}
             </div>
             <div className="flex gap-2 mt-px">
-              <button onClick={addSubject} className="flex-1 btn-secondary text-xs py-2 flex items-center justify-center gap-1.5">
+              <button
+                onClick={addSubject}
+                className="flex-1 btn-secondary text-xs py-2 flex items-center justify-center gap-1.5"
+              >
                 <Plus size={12} /> Add subject
               </button>
-              <button onClick={() => setCalculated(true)} className="flex-1 btn-primary text-xs py-2">
+              <button
+                onClick={() => setCalculated(true)}
+                className="flex-1 btn-primary text-xs py-2"
+              >
                 Calculate APS
               </button>
             </div>
@@ -277,11 +343,14 @@ export default function ApsCalculator() {
           )}
         </div>
 
-        {/* Results */}
+        {/* ── Results panel ────────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-8">
           {!calculated && (
             <div className="card text-center py-16">
-              <p className="text-xs text-stone-500">Enter your marks and click <strong>Calculate APS</strong> to see which courses you qualify for.</p>
+              <p className="text-xs text-stone-500">
+                Upload your report card above, or enter marks manually, then click{' '}
+                <strong>Calculate APS</strong> to see which courses you qualify for.
+              </p>
             </div>
           )}
 
@@ -293,15 +362,20 @@ export default function ApsCalculator() {
 
           {calculated && valid.length >= 3 && (
             <>
-              {/* Filter */}
+              {/* Category filter */}
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => setSelectedCat('all')}
-                  className={`badge cursor-pointer transition-colors ${selectedCat === 'all' ? 'badge-ink' : 'badge-muted hover:badge-ink'}`}>
+                <button
+                  onClick={() => setSelectedCat('all')}
+                  className={`badge cursor-pointer transition-colors ${selectedCat === 'all' ? 'badge-ink' : 'badge-muted hover:badge-ink'}`}
+                >
                   All fields
                 </button>
                 {CATEGORIES.map(cat => (
-                  <button key={cat} onClick={() => setSelectedCat(cat)}
-                    className={`badge cursor-pointer transition-colors ${selectedCat === cat ? 'badge-ink' : 'badge-muted'}`}>
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCat(cat)}
+                    className={`badge cursor-pointer transition-colors ${selectedCat === cat ? 'badge-ink' : 'badge-muted'}`}
+                  >
                     {cat}
                   </button>
                 ))}
@@ -349,13 +423,17 @@ export default function ApsCalculator() {
               {/* Near misses */}
               {nearMiss.length > 0 && (
                 <div>
-                  <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">Almost There — Within 3 APS Points</h2>
+                  <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">
+                    Almost There — Within 3 APS Points
+                  </h2>
                   <div className="border border-stone-300 divide-y divide-stone-300">
                     {nearMiss.map((c, i) => (
                       <div key={i} className="px-5 py-4 bg-stone-100 flex items-center justify-between gap-4">
                         <div>
                           <div className="text-sm font-medium">{c.field}</div>
-                          <div className="text-2xs text-stone-400 uppercase tracking-wider mt-0.5">{c.unis.join(' · ')}</div>
+                          <div className="text-2xs text-stone-400 uppercase tracking-wider mt-0.5">
+                            {c.unis.join(' · ')}
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <div className="text-right">
@@ -373,20 +451,29 @@ export default function ApsCalculator() {
               {/* Bursaries for qualified categories */}
               {qualifiedCategories.length > 0 && (
                 <div>
-                  <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">Bursaries Open in Your Fields</h2>
+                  <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">
+                    Bursaries Open in Your Fields
+                  </h2>
                   <div className="space-y-5">
                     {qualifiedCategories.filter(cat => BURSARIES_BY_FIELD[cat]).map(cat => (
                       <div key={cat}>
                         <div className="section-label mb-3">{cat}</div>
                         <div className="border border-stone-300 divide-y divide-stone-300">
                           {BURSARIES_BY_FIELD[cat].map(b => (
-                            <div key={b.name} className="flex items-center justify-between px-5 py-3.5 bg-stone-100 hover:bg-stone-200 transition-colors">
+                            <div
+                              key={b.name}
+                              className="flex items-center justify-between px-5 py-3.5 bg-stone-100 hover:bg-stone-200 transition-colors"
+                            >
                               <div>
                                 <div className="text-xs font-semibold">{b.name}</div>
                                 <div className="text-2xs text-stone-500 mt-0.5">{b.focus}</div>
                               </div>
-                              <a href={b.url} target="_blank" rel="noopener noreferrer"
-                                className="text-2xs uppercase tracking-widest underline underline-offset-2 hover:no-underline flex-shrink-0 ml-4">
+                              <a
+                                href={b.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-2xs uppercase tracking-widest underline underline-offset-2 hover:no-underline flex-shrink-0 ml-4"
+                              >
                                 Apply
                               </a>
                             </div>
@@ -401,7 +488,9 @@ export default function ApsCalculator() {
               {/* Jobs for qualified categories */}
               {qualifiedCategories.length > 0 && (
                 <div>
-                  <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">Job Opportunities in Your Fields</h2>
+                  <h2 className="font-semibold text-sm uppercase tracking-widest mb-4">
+                    Job Opportunities in Your Fields
+                  </h2>
                   <div className="grid sm:grid-cols-2 gap-px bg-stone-300">
                     {qualifiedCategories.filter(cat => JOBS_BY_CATEGORY[cat]).map(cat => (
                       <div key={cat} className="bg-stone-100 p-5">

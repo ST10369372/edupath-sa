@@ -1,14 +1,16 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { LogOut, User, Globe, ChevronDown } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { LogOut, User, Globe, ChevronDown, Menu } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../context/I18nContext'
+import BackButton from './BackButton'
 import toast from 'react-hot-toast'
 
-export default function TopBar() {
+export default function TopBar({ menuOpen, onMenuClick }) {
   const { profile, signOut } = useAuth()
   const { lang, setLang, LANGUAGES } = useI18n()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [showMenu,   setShowMenu]   = useState(false)
   const [showLang,   setShowLang]   = useState(false)
 
@@ -26,21 +28,27 @@ export default function TopBar() {
 
   return (
     <header
-      className="h-12 flex items-center justify-between px-6 md:px-10 flex-shrink-0 border-b border-stone-300"
+      className="h-12 flex items-center justify-between px-4 md:px-10 flex-shrink-0 border-b border-stone-300"
       style={{ background: 'var(--pageBG)' }}
     >
-      {/* Mobile logo */}
       <div className="md:hidden flex items-center gap-2">
-        <div className="w-6 h-6 bg-ink flex items-center justify-center">
-          <svg viewBox="0 0 14 14" className="w-3 h-3" fill="none">
-            <path d="M2 11 L7 3 L12 11" stroke="#f4f4f0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M4.5 8 L9.5 8" stroke="#f4f4f0" strokeWidth="1.8" strokeLinecap="round"/>
-          </svg>
-        </div>
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-controls="mobile-navigation-menu"
+          aria-expanded={menuOpen}
+          className="p-2 -ml-2 text-stone-700 hover:bg-stone-200 transition-colors"
+        >
+          <Menu size={20} />
+        </button>
+        {pathname !== '/dashboard' && <BackButton />}
         <span className="font-serif text-sm tracking-tight text-ink">EduPath SA</span>
       </div>
 
-      <div className="hidden md:block" />
+      <div className="hidden md:block">
+        {pathname !== '/dashboard' && <BackButton />}
+      </div>
 
       {/* Right */}
       <div className="flex items-center gap-2">
